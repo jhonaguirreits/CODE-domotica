@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Domótica Academy | Smart Home + Nube</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0f172a; --panel-bg: #1e293b; --border-color: #334155;
+            --wokwi-blue: #38bdf8; --text-light: #f8fafc; --text-muted: #94a3b8;
+            --accent: #10b981; --accent-hover: #059669;
+            --nivel-basico: #60a5fa; --nivel-alto: #fbbf24; --nivel-superior: #f43f5e;
+            --error-color: #ef4444; --warning-color: #f59e0b;
+            --glow-primary: 0 0 15px rgba(56, 189, 248, 0.4);
+            --glow-success: 0 0 20px rgba(16, 185, 129, 0.6);
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: var(--bg-dark); color: var(--text-light); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;}
+        ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-track { background: var(--bg-dark); } ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        .screen { display: none; width: 100%; height: 100%; animation: fadeIn 0.4s ease; }
+        .screen.active { display: flex; flex-direction: column; }
+        
+        .login-container { margin: auto; background: var(--panel-bg); padding: 40px; border-radius: 12px; border: 1px solid var(--border-color); text-align: center; max-width: 450px; box-shadow: var(--glow-primary); }
+        .login-container h1 { color: var(--wokwi-blue); margin-bottom: 10px; font-size: 1.8rem;}
+        .login-container p { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px;}
+        .btn-google { background-color: white; color: #444; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 1rem; transition: 0.3s; }
+        .btn-google:hover { background-color: #f1f1f1; transform: translateY(-2px); }
+        .btn-google img { width: 24px; }
+
+        header { padding: 15px 30px; background: var(--panel-bg); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .header-title { font-size: 1.2rem; font-weight: bold; color: var(--wokwi-blue); display: flex; align-items: center; gap: 15px;}
+        .user-badge { background: #0f172a; padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; color: var(--text-light); border: 1px solid var(--border-color); display: flex; gap: 15px; align-items: center;}
+        .xp-text { color: var(--warning-color); font-weight: bold; }
+        .btn-logout { background: transparent; color: var(--error-color); border: 1px solid var(--error-color); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; transition: 0.2s;}
+        .btn-logout:hover { background: var(--error-color); color: white;}
+        .week-selector { background: var(--bg-dark); color: white; border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; font-size: 0.95rem; cursor: pointer; outline: none; }
+        .btn-action { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.4); color: var(--wokwi-blue); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: 0.2s; margin-left: 10px; font-weight: bold;}
+        .btn-action:hover { background: var(--wokwi-blue); color: white;}
+        
+        .main-container { display: grid; grid-template-columns: 500px 1fr; gap: 20px; padding: 20px; flex: 1; overflow: hidden; }
+        .left-panel { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; padding-right: 10px; }
+        
+        .card { background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
+        h2 { margin-top: 0; color: var(--text-light); font-size: 1.3rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        h3 { color: var(--wokwi-blue); font-size: 1.05rem; margin-bottom: 10px; margin-top: 20px;}
+
+        .competencia-box { background: rgba(245, 158, 11, 0.1); border-left: 4px solid var(--warning-color); padding: 12px; margin-bottom: 15px; border-radius: 0 6px 6px 0; font-size: 0.9rem; color: #fde68a; font-weight: bold; }
+        .instruction-box { background: rgba(16, 185, 129, 0.15); border-left: 4px solid var(--accent); padding: 15px; margin: 10px 0; border-radius: 0 6px 6px 0; font-size: 0.95rem; line-height: 1.5;}
+        
+        .materials-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+        @media (min-width: 1400px) { .materials-grid { grid-template-columns: 1fr 1fr; } }
+        .material-list { background: #0f172a; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; color: var(--text-muted); }
+        .material-list h4 { margin: 0 0 8px 0; color: var(--text-light); font-size: 0.9rem; }
+        .material-list ul { margin: 0; padding-left: 15px; }
+        .material-list.boss-materials { border-color: rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.05); }
+        .material-list.boss-materials h4 { color: var(--nivel-superior); }
+
+        .paso-paso-list { list-style-type: decimal; margin-top: 5px; padding-left: 20px; font-size: 0.9rem; color: #bae6fd; line-height: 1.6; }
+        
+        .code-container { position: relative; margin-top: 10px; }
+        .code-block { background: #0f172a; padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); font-family: 'Consolas', monospace; font-size: 0.85rem; color: var(--text-muted); overflow-x: auto; white-space: pre-wrap; margin: 0; }
+        .btn-copy { position: absolute; top: 10px; right: 10px; background: #1e293b; border: 1px solid var(--border-color); color: var(--text-light); padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        
+        .reto-container { margin-bottom: 15px; animation: fadeIn 0.4s; }
+        .reto-box { padding: 15px; border-radius: 6px; font-size: 0.95rem; line-height: 1.5; background: #0f172a; border-left: 5px solid; }
+        .reto-basico { border-left-color: var(--nivel-basico); } .reto-alto { border-left-color: var(--nivel-alto); } .reto-superior { border-left-color: var(--nivel-superior); }
+        .reto-titulo { font-weight: bold; margin-bottom: 8px; }
+        
+        .evaluator-box { background: #1e293b; padding: 15px; border-radius: 0 0 6px 6px; border: 1px solid var(--border-color); border-top: none; }
+        .eval-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); font-weight: bold;}
+        .vidas-display { letter-spacing: 2px; font-size: 1.1rem; }
+
+        .code-input { width: 100%; height: 120px; background: #0f172a; color: var(--text-light); border: 1px solid #334155; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 0.85rem; resize: vertical; box-sizing: border-box; outline: none;}
+        .code-input:focus { border-color: var(--wokwi-blue); }
+        
+        .btn-verify { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 10px; width: 100%; transition: 0.2s;}
+        .btn-verify:hover { background: var(--accent-hover); }
+        .btn-verify:disabled { background: #475569; cursor: not-allowed; color: #94a3b8;}
+        
+        .feedback { margin-top: 10px; font-size: 0.85rem; font-weight: bold; display: none; padding: 15px; border-radius: 4px; line-height: 1.5;}
+        .feedback.error { background: rgba(239, 68, 68, 0.1); color: var(--error-color); border: 1px solid rgba(239, 68, 68, 0.4); display: block;}
+        .feedback.success { background: rgba(16, 185, 129, 0.1); color: var(--accent); border: 1px solid rgba(16, 185, 129, 0.4); display: block;}
+        .feedback.loading { background: rgba(56, 189, 248, 0.1); color: var(--wokwi-blue); border: 1px solid rgba(56, 189, 248, 0.4); display: block;}
+        
+        .msg-pedagogico { display: block; margin-top: 8px; font-style: italic; opacity: 0.9; font-weight: normal; }
+        .safety-warning { color: var(--error-color); font-weight: bold; font-size: 0.85rem; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 10px;}
+
+        .completed-badge { display: flex; align-items: center; justify-content: center; background: rgba(16, 185, 129, 0.1); color: var(--accent); padding: 10px; border-radius: 0 0 6px 6px; font-weight: bold; border: 1px solid var(--border-color); border-top: none;}
+
+        .btn-reset { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); color: var(--error-color); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; transition: 0.2s;}
+        .btn-reset:hover { background: var(--error-color); color: white;}
+
+        .wokwi-container { border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; background: #1e1e1e; }
+        iframe { width: 100%; height: 100%; border: none; }
+        
+        .toast { position: fixed; top: 20px; right: 20px; background: var(--accent); color: white; padding: 15px; border-radius: 8px; display: none; font-weight: bold; z-index: 1000; box-shadow: var(--glow-success); animation: fadeIn 0.3s;}
+
+        .unlock-anim { animation: highlightUnlock 1.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes highlightUnlock { 0% { box-shadow: 0 0 20px var(--nivel-superior); transform: scale(0.98); } 100% { box-shadow: none; transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div id="toast-msg" class="toast">✅ Datos del Hogar Inteligente Guardados</div>
+
+    <div id="screen-login" class="screen active">
+        <div class="login-container">
+            <h1>Domótica Academy</h1>
+            <p>Automatización de Casas Inteligentes.<br>Tu progreso sincronizado en Firebase.</p>
+            <button onclick="loginConGoogle()" class="btn-google">
+                <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google">
+                Ingresar con Google Institucional
+            </button>
+            <div id="loading-login" style="display: none; margin-top: 15px; color: var(--warning-color); font-size: 0.9rem;">
+                ⏳ Conectando con los servidores domóticos...
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-app" class="screen">
+        <header>
+            <div class="header-title">
+                Arquitectura Domótica
+                <div class="user-badge">
+                    <span id="ui-name">Integrador</span>
+                    <span class="xp-text"><span id="ui-score">0</span> XP</span>
+                    <button class="btn-logout" onclick="logout()">Salir</button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button id="btn-cert" onclick="generatePDF()" class="btn-action" style="margin: 0;">📄 Certificado Domótico</button>
+                <select class="week-selector" id="week-select" onchange="loadWeek()">
+                    <option value="1">Semana 1: Iluminación Inteligente</option>
+                    <option value="2">Semana 2: Escalera / Detector Presencia</option>
+                    <option value="3">Semana 3: Control de Acceso (Chapa Eléctrica)</option>
+                    <option value="4">Semana 4: Alarma de Intrusión y Sirena</option>
+                    <option value="5">Semana 5: Dimmer para Sala de Estar</option>
+                    <option value="6">Semana 6: Climatización Automática</option>
+                    <option value="7">Semana 7: Persianas Automatizadas</option>
+                    <option value="8">Semana 8: Riego de Jardín Automático</option>
+                    <option value="9">Semana 9: Panel Central del Hogar (LCD)</option>
+                    <option value="10">SEMANA 10: PROYECTO SMART HOME</option>
+                </select>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <div class="left-panel">
+                
+                <div class="card">
+                    <h2 id="w-title">Misión Domótica</h2>
+                    <div id="w-comp-box" class="competencia-box"></div>
+                    
+                    <h3>🎯 Objetivo de la Instalación</h3>
+                    <div id="w-challenge" class="instruction-box"></div>
+                    
+                    <h3>📦 Lista de Materiales</h3>
+                    <div class="materials-grid">
+                        <div class="material-list">
+                            <h4>Maqueta 5V (Niveles Básico/Alto)</h4>
+                            <ul id="w-comp-sim"></ul>
+                        </div>
+                        <div class="material-list boss-materials" id="box-materials-real" style="display:none;">
+                            <h4>🔓 Instalación Casa Real (110V/220V)</h4>
+                            <ul id="w-comp-real"></ul>
+                        </div>
+                    </div>
+
+                    <h3>🔌 Guía de Cableado</h3>
+                    <div id="box-pasos-sim">
+                        <h4 style="color: var(--nivel-basico); margin-bottom: 5px; margin-top: 10px;">🔧 Fase 1: Maqueta (Segura)</h4>
+                        <ol id="w-steps-sim" class="paso-paso-list"></ol>
+                    </div>
+                    <div id="box-pasos-real" style="display:none; margin-top: 15px; border-left: 3px solid var(--nivel-superior); padding-left: 10px; background: rgba(244, 63, 94, 0.05); border-radius: 0 6px 6px 0; padding: 10px;">
+                        <h4 style="color: var(--nivel-superior); margin: 0 0 5px 0;">⚡ Fase 2: Red Eléctrica Real (Desbloqueada)</h4>
+                        <ol id="w-steps-real" class="paso-paso-list"></ol>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>💻 Código del Controlador (Base)</h2>
+                    <div class="code-container">
+                        <button class="btn-copy" onclick="copyCode()" id="btnCopy">📋 Copiar</button>
+                        <div class="code-block" id="w-code"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>
+                        🚀 Programación del Nodo 
+                        <button class="btn-reset" onclick="resetProgress()">Reiniciar Progreso</button>
+                    </h2>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+                        Cuentas con <strong>3 vidas (intentos de carga)</strong> por módulo.
+                    </div>
+
+                    <div id="r-container-basico" class="reto-container">
+                        <div class="reto-box reto-basico"><div class="reto-titulo" style="color:var(--nivel-basico)">🔵 Automatización Básica (+50 XP)</div><div id="r-desc-basico"></div></div>
+                        <div id="eval-basico" class="evaluator-box">
+                            <div class="eval-header"><span>Compilador Domótico</span> <span id="vidas-basico" class="vidas-display">🏠🏠🏠</span></div>
+                            <textarea id="input-basico" class="code-input" placeholder="Pega el código modificado aquí..."></textarea>
+                            <button id="btn-basico" class="btn-verify" onclick="verifyCode('basico')">Subir a la Casa</button>
+                            <div id="feedback-basico" class="feedback"></div>
+                        </div>
+                        <div id="done-basico" class="completed-badge" style="display:none;">✅ ¡Logica Establecida!</div>
+                    </div>
+
+                    <div id="r-container-alto" class="reto-container" style="display:none;">
+                        <div class="reto-box reto-alto"><div class="reto-titulo" style="color:var(--nivel-alto)">🟠 Mejora de Confort (+100 XP)</div><div id="r-desc-alto"></div></div>
+                        <div id="eval-alto" class="evaluator-box">
+                            <div class="eval-header"><span>Compilador Domótico</span> <span id="vidas-alto" class="vidas-display">🏠🏠🏠</span></div>
+                            <textarea id="input-alto" class="code-input" placeholder="Pega el código modificado aquí..."></textarea>
+                            <button id="btn-alto" class="btn-verify" onclick="verifyCode('alto')">Subir a la Casa</button>
+                            <div id="feedback-alto" class="feedback"></div>
+                        </div>
+                        <div id="done-alto" class="completed-badge" style="display:none;">✅ ¡Confort Optimizado!</div>
+                    </div>
+
+                    <div id="r-container-superior" class="reto-container" style="display:none;">
+                        <div class="reto-box reto-superior">
+                            <div class="reto-titulo" style="color:var(--nivel-superior)">🔴 Integración 110V/220V (+200 XP)</div>
+                            <div id="r-desc-superior"></div>
+                            <div class="safety-warning">⚠️ PELIGRO ELÉCTRICO: Nunca conectes el Arduino directamente a los enchufes de la pared. Utiliza SIEMPRE el Módulo Relé como aislante electromecánico. Pide supervisión del profesor antes de conectar a la corriente alterna (AC).</div>
+                        </div>
+                        <div id="eval-superior" class="evaluator-box">
+                            <div class="eval-header"><span>Certificación de Seguridad</span> <span id="vidas-superior" class="vidas-display">🏠🏠🏠</span></div>
+                            <textarea id="input-superior" class="code-input" placeholder="Verifica la lógica antes de habilitar los relés de potencia..."></textarea>
+                            <button id="btn-superior" class="btn-verify" onclick="verifyCode('superior')">Certificar Circuito de Potencia</button>
+                            <div id="feedback-superior" class="feedback"></div>
+                        </div>
+                        <div id="done-superior" class="completed-badge" style="display:none;">🏆 ¡HABITACIÓN DOMOTIZADA!</div>
+                    </div>
+                    
+                    <div id="msg-victoria" style="text-align: center; color: var(--accent); font-weight: bold; margin-top: 15px; display: none; font-size: 1.1rem;">
+                        🚀 ¡Felicidades Integrador! El sistema de esta habitación está operativo. Ve a la siguiente semana.
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="wokwi-container">
+                <iframe src="https://wokwi.com/projects/new/arduino-uno?embed=1" title="Simulador Wokwi"></iframe>
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* ========================================================================= */
+    /* 1. SISTEMA DE AUDIO SEGURO                                                */
+    /* ========================================================================= */
+    let audioCtx;
+    function initAudio() { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+    function playSound(type) {
+        try {
+            if(!audioCtx) return;
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
+            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            if (type === 'success') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.3); 
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.3);
+            }
+        } catch(e) {}
+    }
+
+    /* ========================================================================= */
+    /* 2. CONFIGURACIÓN FIREBASE                                                 */
+    /* ========================================================================= */
+    const firebaseConfig = {
+        apiKey: "AIzaSyDNBy-QKS5eNSinEI5ROOhR94YGKvbA0cg",
+        authDomain: "codequestpro-78796.firebaseapp.com",
+        projectId: "codequestpro-78796",
+        storageBucket: "codequestpro-78796.firebasestorage.app",
+        messagingSenderId: "383335669814",
+        appId: "1:383335669814:web:70d1fd4e04b77aca63f897"
+    };
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    const auth = firebase.auth(); const firestore = firebase.firestore();
+
+    /* ========================================================================= */
+    /* 3. LÓGICA DE USUARIOS Y NUBE                                              */
+    /* ========================================================================= */
+    let user = null; let currentLvlIndex = 0; let currentLives = 3;
+    const levels = ['basico', 'alto', 'superior'];
+
+    function loginConGoogle() {
+        initAudio(); document.getElementById('loading-login').style.display = 'block';
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).then((result) => {
+            cargarDatosDeLaNube(result.user);
+        }).catch((error) => {
+            document.getElementById('loading-login').style.display = 'none';
+            alert("❌ Error al iniciar sesión.");
+        });
+    }
+
+    function cargarDatosDeLaNube(googleUser) {
+        if (!googleUser || !googleUser.email) return;
+
+        // 🛡️ FILTRO DE CORREO INSTITUCIONAL ITS PEREIRA
+        if (!googleUser.email.endsWith("@itspereira.edu.co")) {
+            alert("⛔ ACCESO DENEGADO.\n\nSolo puedes ingresar a Domótica Academy utilizando tu correo institucional (@itspereira.edu.co).");
+            logout(); return; 
+        }
+
+        // Base de datos de Domótica separada
+        firestore.collection("estudiantes_domotica").doc(googleUser.email).get().then((doc) => {
+            if (doc.exists) {
+                user = doc.data();
+                if(!user.progress) user.progress = {};
+                bienvenidaUsuario();
+            } else {
+                let gradoEstudiante = prompt("¡Bienvenido a Domótica Academy! Ingresa tu curso (Ej: 1001, 1002):");
+                user = {
+                    email: googleUser.email, nombres: googleUser.displayName || "Integrador",
+                    grado: gradoEstudiante || "N/A", score: 0, progress: {} 
+                };
+                guardarProgresoEnLaNube();
+                bienvenidaUsuario();
+            }
+        }).catch((error) => {
+            alert("❌ ERROR DE FIREBASE:\n\n" + error.message);
+            document.getElementById('loading-login').style.display = 'none';
+        });
+    }
+
+    function bienvenidaUsuario() {
+        document.getElementById('screen-login').classList.remove('active');
+        document.getElementById('screen-app').classList.add('active');
+        playSound('success');
+        document.getElementById('ui-name').innerText = user.nombres;
+        document.getElementById('ui-score').innerText = user.score;
+        loadWeek(); 
+    }
+
+    function guardarProgresoEnLaNube(mostrarToast = false) {
+        if(user && user.email) {
+            firestore.collection("estudiantes_domotica").doc(user.email).set(user)
+            .then(() => {
+                if(mostrarToast) {
+                    const t = document.getElementById('toast-msg');
+                    t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000);
+                }
+            }).catch(e => console.error(e));
+        }
+    }
+
+    function logout() { auth.signOut().then(() => { user = null; document.getElementById('screen-app').classList.remove('active'); document.getElementById('screen-login').classList.add('active'); }); }
+
+    /* ========================================================================= */
+    /* 4. BASE DE DATOS DE RETOS DOMÓTICA                                        */
+    /* ========================================================================= */
+    const mensajesExito = [
+        "¡Excelente lógica! Has configurado la domótica correctamente.",
+        "¡Felicidades! El sistema de la casa está respondiendo a tus órdenes.",
+        "¡Muy bien! Ahora entiendes cómo un pulso digital puede controlar electrodomésticos.",
+        "¡Brillante! Esta habitación ha quedado automatizada."
+    ];
+    const mensajesFallo = [
+        "¡Alto! Hay un corto en tu lógica. Revisa la estructura.",
+        "Ese código no pasará la inspección de seguridad del hogar. Verifica tus llaves y puntos y coma.",
+        "Pista: Asegúrate de declarar el pin correcto como OUTPUT o INPUT.",
+        "¡Intenta de nuevo! En la vida real esto habría quemado un fusible."
+    ];
+
+    const weeks = {
+        1: {
+            title: "Iluminación Inteligente Básica",
+            competencia: "Control de circuitos de potencia alterna mediante relés electromecánicos.",
+            challenge: "Enciende y apaga las luces de una habitación desde el microcontrolador de forma cíclica para simular presencia cuando la casa está sola.",
+            simMaterials: ["Arduino UNO", "Protoboard", "LED", "Resistor 220Ω"],
+            realMaterials: ["Módulo Relé (1 Canal)", "Enchufe y Cable AC", "Bombillo 110V/220V", "Roseta"],
+            pasoSim: [
+                "Conecta el PIN 13 al ánodo (pata larga) del LED.",
+                "Conecta el cátodo del LED a la resistencia y de ahí a GND."
+            ],
+            pasoReal: [
+                "Conecta el PIN 13 al pin 'IN' del Módulo Relé.",
+                "Conecta VCC y GND del Relé al Arduino (5V y GND).",
+                "Corta SOLO UN CABLE (la Fase) de la extensión AC. Conecta un extremo al COM y el otro al NO del Relé."
+            ],
+            code: `void setup() {\n  pinMode(13, OUTPUT); // Pin del Relé de Sala\n}\nvoid loop() {\n  digitalWrite(13, HIGH); // Enciende la luz\n  delay(2000);\n  digitalWrite(13, LOW);  // Apaga la luz\n  delay(2000);\n}`,
+            retos: {
+                basico: { desc: "Agrega la luz del pasillo (PIN 12) y enciéndela al mismo tiempo que la sala.", match: ["12,OUTPUT", "digitalWrite(12,HIGH)"] },
+                alto: { desc: "Haz que alternen: Si la sala está encendida, el pasillo se apaga, y viceversa.", match: ["13,HIGH", "12,LOW"] },
+                superior: { desc: "Simulación de Presencia: Haz que la luz real de la casa (PIN 13) prenda 5 segundos y se apague 1 segundo de forma indefinida.", match: ["delay(5000)", "delay(1000)"] }
+            }
+        },
+        2: {
+            title: "Escalera / Detector Presencia",
+            competencia: "Integración de sensores infrarrojos para automatización por presencia.",
+            challenge: "Automatiza la luz de la escalera para que solo se encienda cuando alguien camina cerca, ahorrando energía.",
+            simMaterials: ["Arduino", "Sensor de Movimiento PIR", "LED"],
+            realMaterials: ["Sensor PIR (HC-SR501)", "Módulo Relé", "Lámpara de Escalera 110V"],
+            pasoSim: [
+                "Conecta la señal (OUT) del sensor PIR al PIN 2.",
+                "Conecta un LED al PIN 8 para simular la lámpara."
+            ],
+            pasoReal: [
+                "Mantén el sensor PIR en el PIN 2.",
+                "Pasa el control del LED (PIN 8) hacia el pin IN del Relé que controlará la lámpara AC."
+            ],
+            code: `void setup() {\n  pinMode(8, OUTPUT);\n  pinMode(2, INPUT);\n}\nvoid loop() {\n  int movimiento = digitalRead(2);\n  if(movimiento == HIGH) {\n    digitalWrite(8, HIGH);\n  } else {\n    digitalWrite(8, LOW);\n  }\n}`,
+            retos: {
+                basico: { desc: "Añade un retardo de confort: Si detecta movimiento, espera 3 segundos (3000ms) antes de apagar dentro del if.", match: ["delay(3000)"] },
+                alto: { desc: "Agrega un LED Testigo en el cuarto de control (PIN 13) que indique si hay alguien en la escalera.", match: ["13,OUTPUT", "digitalWrite(13,HIGH)"] },
+                superior: { desc: "Sistema Dual: Si hay movimiento, enciende el Relé (PIN 8) de la escalera y activa un Buzzer suave (PIN 9) avisando que alguien sube.", match: ["9,OUTPUT", "digitalWrite(9,HIGH)"] }
+            }
+        },
+        3: {
+            title: "Control de Acceso Automático",
+            competencia: "Diseño de sistemas de control de acceso físico automatizado.",
+            challenge: "Sustituye la llave tradicional por un sistema electrónico que abre la cerradura (simulada con servo) al presionar un botón desde adentro.",
+            simMaterials: ["Servomotor", "Pulsador miniatura"],
+            realMaterials: ["Servomotor de alto torque", "Chapa eléctrica / Pasador impreso en 3D", "Botón de pared"],
+            pasoSim: [
+                "Conecta el botón al PIN 7 y a GND (usando INPUT_PULLUP).",
+                "Conecta el cable de señal del Servo al PIN 9."
+            ],
+            pasoReal: [
+                "Instala el servo físicamente en el cerrojo de la puerta.",
+                "Pasa el cable del botón hacia la recepción de la casa."
+            ],
+            code: `#include <Servo.h>\nServo cerradura;\nvoid setup() {\n  cerradura.attach(9);\n  pinMode(7, INPUT_PULLUP);\n  cerradura.write(0); // Puerta bloqueada\n}\nvoid loop() {\n  if(digitalRead(7) == LOW) {\n    cerradura.write(90); // Abre la puerta\n    delay(5000);\n    cerradura.write(0); // Cierra automático\n  }\n}`,
+            retos: {
+                basico: { desc: "Agrega un LED Verde (PIN 4) que se encienda MIENTRAS la puerta está abierta.", match: ["4,OUTPUT", "digitalWrite(4,HIGH)"] },
+                alto: { desc: "Reduce el tiempo de apertura de la puerta a solo 2 segundos por seguridad.", match: ["delay(2000)"] },
+                superior: { desc: "Apertura Biométrica Simulada: Cambia la lectura digital por una analógica (A0 simulando huella). Si es > 800, abre la cerradura.", match: ["analogRead(A0)", ">800"] }
+            }
+        },
+        4: {
+            title: "Alarma de Intrusión y Sirena",
+            competencia: "Implementación de lógicas de seguridad y alertas sonoras.",
+            challenge: "Detectar si una ventana es abierta (contacto magnético) y activar inmediatamente una sirena de advertencia en la casa.",
+            simMaterials: ["Pulsador (simula magnético)", "Buzzer 5V"],
+            realMaterials: ["Sensor Magnético MC-38", "Módulo Relé", "Sirena 12V de Alarma"],
+            pasoSim: [
+                "Sensor a PIN 2 y GND.",
+                "Buzzer a PIN 10."
+            ],
+            pasoReal: [
+                "El Sensor magnético va en el marco de la ventana real.",
+                "El PIN 10 controla el Módulo Relé que deja pasar los 12V de una fuente a la sirena física."
+            ],
+            code: `void setup() {\n  pinMode(10, OUTPUT);\n  pinMode(2, INPUT_PULLUP);\n}\nvoid loop() {\n  // LOW significa imán pegado (Cerrado)\n  // HIGH significa ventana abierta\n  if(digitalRead(2) == HIGH) {\n    tone(10, 1000);\n  } else {\n    noTone(10);\n  }\n}`,
+            retos: {
+                basico: { desc: "Cambia la frecuencia de la sirena a 2000 Hz para que sea más aguda.", match: ["tone(10,2000)"] },
+                alto: { desc: "Agrega parpadeo en las luces principales (Relé PIN 13) cuando suene la alarma.", match: ["13,OUTPUT", "13,HIGH", "delay("] },
+                superior: { desc: "Alarma Perimetral: Sirena pulsante (policial). Si la ventana está abierta, haz que alterne tone(10,800) y tone(10,1200) con delays cortos.", match: ["tone(10,800)", "tone(10,1200)", "delay("] }
+            }
+        },
+        5: {
+            title: "Dimmer para Sala de Estar",
+            competencia: "Atenuación de iluminación mediante modulación por ancho de pulso (PWM).",
+            challenge: "Controla la intensidad de las luces de la sala (Tiras LED decorativas) con una perilla para generar ambientes de cine o lectura.",
+            simMaterials: ["Potenciómetro", "LED"],
+            realMaterials: ["Potenciómetro de pared", "Transistor MOSFET IRLZ44N", "Tira LED 12V (Techo de sala)"],
+            pasoSim: [
+                "Centro del pot a A0.",
+                "LED de simulación al PIN 5 (~PWM)."
+            ],
+            pasoReal: [
+                "Cambia el LED por la compuerta (G) del MOSFET.",
+                "Usa el MOSFET para regular los 12V que van a la tira LED arquitectónica."
+            ],
+            code: `void setup() {\n  pinMode(5, OUTPUT);\n}\nvoid loop() {\n  int perilla = analogRead(A0);\n  int brillo = map(perilla, 0, 1023, 0, 255);\n  analogWrite(5, brillo);\n}`,
+            retos: {
+                basico: { desc: "Limita el brillo máximo al 50% de su capacidad (cambia el map a max 127).", match: ["map(perilla,0,1023,0,127)"] },
+                alto: { desc: "Apagado ecológico: Si la lectura es < 50, pon el brillo en 0 forzosamente usando un IF.", match: ["<50", "0"] },
+                superior: { desc: "Modo Cine Automático: Si el usuario presiona un botón (PIN 2, INPUT_PULLUP) LOW, pon el brillo fijo en 50 (tenue) sin importar la perilla.", match: ["digitalRead(2)", "analogWrite(5,50)"] }
+            }
+        },
+        6: {
+            title: "Climatización Automática",
+            competencia: "Control de climatización térmica en lazo cerrado.",
+            challenge: "Lee la temperatura de la habitación y enciende un ventilador o aire acondicionado de forma autónoma si hace mucho calor.",
+            simMaterials: ["Sensor DHT22", "LED"],
+            realMaterials: ["Sensor DHT22", "Módulo Relé", "Ventilador de Pedestal 110V"],
+            pasoSim: [
+                "Señal del DHT22 al PIN 4.",
+                "LED al PIN 8."
+            ],
+            pasoReal: [
+                "El PIN 8 controlará el Relé que puentea la corriente AC del ventilador de la casa."
+            ],
+            code: `#include "DHT.h"\nDHT dht(4, DHT22);\nvoid setup() {\n  dht.begin();\n  pinMode(8, OUTPUT);\n}\nvoid loop() {\n  float temp = dht.readTemperature();\n  if(temp > 28) {\n    digitalWrite(8, HIGH); // Prende AC\n  } else {\n    digitalWrite(8, LOW); // Apaga AC\n  }\n  delay(2000);\n}`,
+            retos: {
+                basico: { desc: "Baja el umbral de calor para que encienda si pasa de los 25 grados.", match: [">25"] },
+                alto: { desc: "Calefacción Dual: Agrega un Relé (PIN 9) que encienda un 'calentador' si la temperatura cae por debajo de 15 grados.", match: ["<15", "9,HIGH"] },
+                superior: { desc: "Impresión de Telemetría: Agrega Serial.begin(9600) en el setup y usa Serial.println(temp) para ver la temperatura en pantalla.", match: ["Serial.begin", "Serial.println(temp)"] }
+            }
+        },
+        7: {
+            title: "Persianas Automatizadas",
+            competencia: "Automatización de sistemas mecánicos en respuesta a condiciones lumínicas.",
+            challenge: "Abre o cierra las cortinas del hogar dependiendo de la luz del sol que pegue en la ventana.",
+            simMaterials: ["Fotorresistencia (LDR)", "Resistencia 10k", "Servomotor"],
+            realMaterials: ["Módulo LDR LUZ", "Servomotor de rotación continua / Moto-reductor", "Persiana real"],
+            pasoSim: [
+                "Haz un divisor de voltaje con la LDR y resistencia, al pin A1.",
+                "Servo al PIN 9."
+            ],
+            pasoReal: [
+                "Instala el LDR pegado al vidrio de la ventana apuntando hacia afuera.",
+                "Acopla el motor al sistema de poleas de la persiana."
+            ],
+            code: `#include <Servo.h>\nServo persiana;\nvoid setup() {\n  persiana.attach(9);\n}\nvoid loop() {\n  int luzSol = analogRead(A1);\n  // A mayor luz, menor valor en LDR configurada a VCC\n  if(luzSol < 400) {\n    persiana.write(180); // Cierra (Mucho Sol)\n  } else {\n    persiana.write(0);   // Abre (Nublado/Noche)\n  }\n  delay(1000);\n}`,
+            retos: {
+                basico: { desc: "Cambia el ángulo de cierre a 90 grados (modo persianas a media asta).", match: ["write(90)"] },
+                alto: { desc: "Enciende la luz de la sala (PIN 13) automáticamente si está de noche (luzSol > 800).", match: ["13,OUTPUT", ">800", "13,HIGH"] },
+                superior: { desc: "Ahorro Energético Integral: Si hay mucho sol (<400) cierra persianas (180) Y asegura que las luces interiores (PIN 13) estén APAGADAS.", match: ["13,LOW", "write(180)"] }
+            }
+        },
+        8: {
+            title: "Riego de Jardín Automático",
+            competencia: "Gestión automatizada de recursos hídricos en exteriores.",
+            challenge: "Mide la humedad de la tierra de las plantas. Si están secas, enciende la electroválvula de riego.",
+            simMaterials: ["Potenciómetro (Simula sensor de humedad)", "LED Azul"],
+            realMaterials: ["Sensor de Humedad de Suelo", "Módulo Relé", "Electroválvula de Agua 12V / Bomba de agua"],
+            pasoSim: [
+                "Pin de lectura a A0.",
+                "LED simulando bomba al PIN 12."
+            ],
+            pasoReal: [
+                "Clava el sensor en la maceta principal.",
+                "Usa el Relé (PIN 12) para dejar pasar agua por la manguera."
+            ],
+            code: `void setup() {\n  pinMode(12, OUTPUT);\n}\nvoid loop() {\n  int humedad = analogRead(A0);\n  // 1023 es totalmente seco, 0 es agua\n  if(humedad > 800) {\n    digitalWrite(12, HIGH); // Riega\n  } else {\n    digitalWrite(12, LOW);  // Detiene el agua\n  }\n  delay(5000);\n}`,
+            retos: {
+                basico: { desc: "Cambia el umbral para que riegue más rápido (cuando pase de 600).", match: [">600"] },
+                alto: { desc: "Alerta de Tanque Vacío: Si está regando (dentro del if), haz que un LED Amarillo (PIN 8) parpadee indicando consumo de agua.", match: ["8,OUTPUT", "delay(", "8,HIGH"] },
+                superior: { desc: "Riego Temporalizado: Cuando la tierra esté seca (>800), riega SOLO por 10 segundos, y luego apaga la bomba y espera 1 minuto (60000ms) para que absorba.", match: ["delay(10000)", "LOW", "delay(60000)"] }
+            }
+        },
+        9: {
+            title: "Panel Central del Hogar (LCD)",
+            competencia: "Visualización de telemetría del hogar inteligente en interfaces HMI.",
+            challenge: "Construir la pantalla principal de la casa inteligente para mostrar el estado de la casa a los residentes.",
+            simMaterials: ["Pantalla LCD I2C", "Pulsador"],
+            realMaterials: ["Pantalla LCD I2C", "Placa de pared impresa en 3D"],
+            pasoSim: [
+                "Conecta la pantalla I2C: GND y 5V, SDA al PIN A4, SCL al PIN A5.",
+                "Botón a PIN 2."
+            ],
+            pasoReal: [
+                "Monta la pantalla en el pasillo principal de la casa.",
+                "Conecta los cables I2C y asegura voltajes estables."
+            ],
+            code: `#include <LiquidCrystal_I2C.h>\nLiquidCrystal_I2C lcd(0x27,16,2);\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n  lcd.setCursor(0,0);\n  lcd.print(\"Smart Home v1.0\");\n}\nvoid loop() {}`,
+            retos: {
+                basico: { desc: "Escribe en la segunda fila (setCursor 0,1) el texto: 'Todo Normal'.", match: ["setCursor(0,1)", "print(\"Todo"] },
+                alto: { desc: "Agrega parpadeo en el texto de la pantalla borrando el LCD cada cierto tiempo en el loop.", match: ["clear()", "delay("] },
+                superior: { desc: "Integración de Sensor: Muestra la lectura en vivo de la Humedad (A0) en la pantalla constantemente.", match: ["analogRead(A0)", "print("] }
+            }
+        },
+        10: {
+            title: "PROYECTO SMART HOME",
+            competencia: "Integración arquitectónica de sistemas domóticos de múltiples variables.",
+            challenge: "Une sensores (Entradas) y actuadores (Salidas) en un solo sistema centralizado que proteja la casa y automatice tareas.",
+            simMaterials: ["PIR", "Botón", "Buzzer", "LCD", "Relé"],
+            realMaterials: ["Casa domotizada completa: Iluminación AC, Cerrojo Servo y Alarmas centralizadas en un Mega/UNO."],
+            pasoSim: [
+                "Integra LCD (I2C), Botón (7), Relé (13), Servo (9) y Buzzer (10)."
+            ],
+            pasoReal: [
+                "Revisa meticulosamente todas las tierras (GND). Nunca mezcles la Fase AC con el Arduino."
+            ],
+            code: `#include <Servo.h>\n#include <LiquidCrystal_I2C.h>\nLiquidCrystal_I2C lcd(0x27,16,2);\nServo p;\nvoid setup() { lcd.init(); lcd.backlight(); p.attach(9); pinMode(7, INPUT_PULLUP); pinMode(13, OUTPUT); p.write(0); }\nvoid loop() {\n if(digitalRead(7)==LOW){\n  p.write(90);\n  digitalWrite(13, HIGH);\n  lcd.clear(); lcd.print(\"Bienvenido\");\n  delay(3000);\n } else {\n  p.write(0); digitalWrite(13, LOW);\n }\n}`,
+            retos: {
+                basico: { desc: "Agrega 'Casa Cerrada' en el LCD cuando esté en estado de reposo (else).", match: ["print(\"Casa"] },
+                alto: { desc: "Agrega un tono de bienvenida (Buzzer PIN 10) cuando se abre la casa.", match: ["10,OUTPUT", "tone(10"] },
+                superior: { desc: "Seguridad Anti-Robo: Si el PIR (PIN 2) detecta movimiento y la puerta estaba cerrada, haz sonar una alarma fuerte en el Buzzer (PIN 10) y prende luces (13).", match: ["digitalRead(2)", "tone(10", "13,HIGH"] }
+            }
+        }
+    };
+
+    /* ========================================================================= */
+    /* 5. MOTOR DE INTERFAZ Y AUTO-GRADER                                        */
+    /* ========================================================================= */
+    function loadWeek() {
+        if(!user) return; 
+
+        const w = document.getElementById('week-select').value;
+        const d = weeks[w];
+        
+        document.getElementById('w-title').innerText = `Módulo: ${d.title}`;
+        document.getElementById('w-comp-box').innerHTML = `<b>🎓 Competencia Técnica:</b><br>${d.competencia}`;
+        document.getElementById('w-challenge').innerText = d.challenge;
+        
+        document.getElementById('w-comp-sim').innerHTML = d.simMaterials.map(c => `<li>${c}</li>`).join('');
+        document.getElementById('w-comp-real').innerHTML = d.realMaterials.map(c => `<li>${c}</li>`).join('');
+        
+        document.getElementById('w-steps-sim').innerHTML = d.pasoSim.map(wi => `<li>${wi}</li>`).join('');
+        document.getElementById('w-steps-real').innerHTML = d.pasoReal.map(wi => `<li>${wi}</li>`).join('');
+        
+        document.getElementById('w-code').innerText = d.code;
+        
+        levels.forEach(lvl => {
+            document.getElementById(`r-desc-${lvl}`).innerText = d.retos[lvl].desc;
+            document.getElementById(`input-${lvl}`).value = ""; 
+            document.getElementById(`feedback-${lvl}`).style.display = "none";
+            document.getElementById(`btn-${lvl}`).disabled = false;
+        });
+
+        if (!user.progress[w]) { user.progress[w] = { lvl: 0, lives: 3 }; }
+        currentLvlIndex = user.progress[w].lvl;
+        currentLives = user.progress[w].lives;
+
+        applyUI();
+    }
+
+    function updateLivesDisplay(lvl) {
+        const heartsText = "🏠".repeat(currentLives) + "❌".repeat(3 - currentLives);
+        document.getElementById(`vidas-${lvl}`).innerText = heartsText;
+    }
+
+    function applyUI() {
+        document.getElementById('msg-victoria').style.display = 'none';
+        const matReal = document.getElementById('box-materials-real');
+        const pasosReal = document.getElementById('box-pasos-real');
+        
+        if (currentLvlIndex >= 2) {
+            matReal.style.display = 'block'; pasosReal.style.display = 'block';
+            if (currentLvlIndex === 2) {
+                matReal.classList.add('unlock-anim'); pasosReal.classList.add('unlock-anim');
+                setTimeout(() => { matReal.classList.remove('unlock-anim'); pasosReal.classList.remove('unlock-anim'); }, 1500);
+            }
+        } else {
+            matReal.style.display = 'none'; pasosReal.style.display = 'none';
+        }
+
+        levels.forEach((lvl, index) => {
+            const container = document.getElementById(`r-container-${lvl}`);
+            const evalBox = document.getElementById(`eval-${lvl}`);
+            const doneBadge = document.getElementById(`done-${lvl}`);
+            const btn = document.getElementById(`btn-${lvl}`);
+            const fb = document.getElementById(`feedback-${lvl}`);
+
+            if (index < currentLvlIndex) {
+                container.style.display = 'block'; evalBox.style.display = 'none'; doneBadge.style.display = 'flex';
+            } else if (index === currentLvlIndex) {
+                container.style.display = 'block'; evalBox.style.display = 'block'; doneBadge.style.display = 'none';
+                updateLivesDisplay(lvl);
+
+                if (currentLives <= 0) {
+                    btn.disabled = true; fb.className = "feedback error";
+                    fb.innerHTML = "🛑 <strong>Red de seguridad bloqueada.</strong> <br><br> <span class='msg-pedagogico'>Agotaste tus intentos. Pulsa 'Reiniciar Progreso' para reconstruir el código.</span>";
+                    fb.style.display = "block";
+                }
+            } else {
+                container.style.display = 'none';
+            }
+        });
+
+        if (currentLvlIndex >= levels.length) document.getElementById('msg-victoria').style.display = 'block';
+    }
+
+    function limpiarComentarios(codigo) { return codigo.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, "").trim(); }
+
+    function testearCodigoLocal(codigo, matchers) {
+        let sinEspacios = codigo.replace(/\s+/g, '');
+        if(!sinEspacios.includes("setup()") || !sinEspacios.includes("loop()")) { return { aprobado: false, msg: "Estructura principal (setup/loop) no encontrada." }; }
+        for (let palabra of matchers) {
+            let pSinEspacios = palabra.replace(/\s+/g, '');
+            if (!sinEspacios.includes(pSinEspacios)) { return { aprobado: false, msg: "Falta una instrucción crítica pedida en el reto." }; }
+        }
+        return { aprobado: true, msg: "Código compilado y validado." };
+    }
+
+    function verifyCode(level) {
+        if (currentLives <= 0) return;
+        const w = document.getElementById('week-select').value;
+        const rawCode = document.getElementById(`input-${level}`).value;
+        const fb = document.getElementById(`feedback-${level}`);
+        const btn = document.getElementById(`btn-${level}`);
+
+        if (rawCode.trim() === "") {
+            fb.className = "feedback error"; fb.innerText = "❌ No enviaste datos. Pega tu solución."; fb.style.display="block"; playSound('error'); return;
+        }
+
+        const cleanCode = limpiarComentarios(rawCode);
+        const originalBtnText = btn.innerText;
+        btn.disabled = true; btn.innerText = "⚙️ Comprobando cortocircuitos...";
+        fb.style.display = "block"; fb.className = "feedback loading"; fb.innerText = "Analizando lógica del hogar...";
+
+        setTimeout(() => {
+            const retoActual = weeks[w].retos[level];
+            const resultado = testearCodigoLocal(cleanCode, retoActual.match);
+            const msjPedagogico = resultado.aprobado ? mensajesExito[Math.floor(Math.random()*mensajesExito.length)] : mensajesFallo[Math.floor(Math.random()*mensajesFallo.length)];
+
+            if (resultado.aprobado) {
+                playSound('success'); fb.className = "feedback success";
+                fb.innerHTML = `✅ <strong>¡Instalación Exitosa!</strong> ${resultado.msg}<br><span class="msg-pedagogico">${msjPedagogico}</span>`;
+                
+                let xpGanada = level === 'basico' ? 50 : (level === 'alto' ? 100 : 200);
+                user.score += xpGanada; document.getElementById('ui-score').innerText = user.score;
+
+                currentLives = 3; currentLvlIndex++;
+                user.progress[w].lvl = currentLvlIndex; user.progress[w].lives = currentLives;
+                
+                guardarProgresoEnLaNube(true);
+
+                setTimeout(() => {
+                    if(level === 'superior') { triggerConfetti(); }
+                    else if(level === 'alto') { triggerConfetti(0.5); }
+                    applyUI();
+                }, 1500);
+
+            } else {
+                playSound('error'); currentLives--;
+                user.progress[w].lives = currentLives; guardarProgresoEnLaNube(false); updateLivesDisplay(level);
+
+                fb.className = "feedback error";
+                if (currentLives > 0) {
+                    fb.innerHTML = `❌ <strong>Error Eléctrico:</strong> ${resultado.msg}<br><br>Quedan ${currentLives} intento(s). <br><span class="msg-pedagogico">${msjPedagogico}</span>`;
+                } else {
+                    fb.innerHTML = `🛑 <strong>Sistema Quemado.</strong> ${resultado.msg}<br><br><span class="msg-pedagogico">El simulador se ha bloqueado. Pulsa 'Reiniciar Progreso'.</span>`;
+                    document.getElementById(`btn-${level}`).disabled = true;
+                }
+            }
+            if (currentLives > 0) { btn.disabled = false; btn.innerText = originalBtnText; }
+        }, 800);
+    }
+
+    function resetProgress() {
+        if(confirm("¿Deseas restablecer el nodo domótico y recuperar las vidas?")) {
+            const w = document.getElementById('week-select').value;
+            user.progress[w] = { lvl: 0, lives: 3 };
+            guardarProgresoEnLaNube(true); loadWeek();
+        }
+    }
+
+    function copyCode() {
+        navigator.clipboard.writeText(document.getElementById('w-code').innerText).then(() => {
+            const b = document.getElementById('btnCopy'); b.innerText = "✅"; setTimeout(() => b.innerText = "📋 Copiar", 1500);
+        });
+    }
+
+    function triggerConfetti(scale = 1.0) {
+        try {
+            var end = Date.now() + (2000 * scale);
+            var i = setInterval(function() {
+                if (Date.now() > end) return clearInterval(i);
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 30 * scale, spread: 70, origin: { x: Math.random(), y: Math.random() - 0.2 } });
+                }
+            }, 200);
+        } catch(e){}
+    }
+
+    /* ========================================================================= */
+    /* 6. GENERADOR DE PDF DOMÓTICA CON COMPETENCIAS                             */
+    /* ========================================================================= */
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const w = doc.internal.pageSize.getWidth(); const h = doc.internal.pageSize.getHeight();
+
+        let semanasCompletas = [];
+        for(let i=1; i<=10; i++) { 
+            if(user.progress[i] && user.progress[i].lvl >= 3) {
+                semanasCompletas.push(i);
+            } 
+        }
+        
+        const isGraduated = semanasCompletas.length >= 10;
+
+        doc.setFillColor(15, 23, 42); doc.rect(0, 0, w, h, 'F');
+        doc.setDrawColor(56, 189, 248); doc.setLineWidth(2); doc.rect(5, 5, w - 10, h - 10);
+
+        doc.setTextColor(56, 189, 248); doc.setFont("helvetica", "bold"); doc.setFontSize(isGraduated ? 28 : 22);
+        doc.text(isGraduated ? "CERTIFICACIÓN EN ARQUITECTURA DOMÓTICA" : "REPORTE DE INTEGRACIÓN SMART HOME", w / 2, 25, { align: "center" });
+
+        doc.setTextColor(255, 255, 255); doc.setFontSize(13); doc.setFont("helvetica", "normal");
+        let subTitle = isGraduated ? "Por superar con excelencia la integración de espacios automatizados y el control de AC:" : "Constancia de avance en las misiones de domotización e Internet de las Cosas para:";
+        doc.text(subTitle, w / 2, 38, { align: "center" });
+
+        doc.setFontSize(32); doc.setTextColor(16, 185, 129); doc.setFont("helvetica", "bold");
+        doc.text(user.nombres.toUpperCase(), w / 2, 53, { align: "center" });
+
+        doc.setFontSize(13); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "normal");
+        doc.text(`Grado/Curso: ${user.grado} | ITS Pereira`, w / 2, 63, { align: "center" });
+
+        doc.setTextColor(245, 158, 11); doc.setFontSize(12); doc.setFont("helvetica", "bold");
+        doc.text(`Espacios Domotizados: ${semanasCompletas.length}/10 | Experiencia: ${user.score} XP`, w / 2, 73, { align: "center" });
+
+        doc.setDrawColor(255, 255, 255); doc.setLineWidth(0.5); doc.line(30, 80, w - 30, 80);
+        
+        // --- SECCIÓN DE COMPETENCIAS (NUEVO) ---
+        doc.setFontSize(11); doc.setTextColor(255, 255, 255);
+        doc.text("COMPETENCIAS TÉCNICAS ADQUIRIDAS:", 35, 90);
+        
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(200, 200, 200);
+        let yPos = 100;
+        if(semanasCompletas.length === 0) {
+            doc.text("• Aún no se han completado instalaciones físicas Nivel Superior.", 40, yPos);
+        } else {
+            // Imprimir hasta un máximo de 6 competencias para que quepan bien
+            let limite = Math.min(semanasCompletas.length, 6);
+            for(let i=0; i<limite; i++) {
+                let semanaId = semanasCompletas[i];
+                let textoCompetencia = "• " + weeks[semanaId].competencia;
+                doc.text(textoCompetencia, 40, yPos);
+                yPos += 8;
+            }
+            if(semanasCompletas.length > 6) {
+                doc.text("• ...y competencias avanzadas de integración multipunto.", 40, yPos);
+            }
+        }
+        // ----------------------------------------
+
+        doc.setFontSize(10); doc.setTextColor(148, 163, 184);
+        doc.text("Director del Proyecto (IoT & Domótica)", 75, h - 25, { align: "center" });
+        doc.text(`Fecha: ${new Date().toLocaleDateString('es-CO')}`, w - 75, h - 25, { align: "center" });
+
+        doc.setFontSize(8); doc.setTextColor(71, 85, 105);
+        const token = btoa(user.email).substring(0, 10).toUpperCase();
+        doc.text(`CÓDIGO DE VALIDACIÓN DOMÓTICO: DMO-V1-${token}`, w / 2, h - 10, { align: "center" });
+
+        let safeName = user.nombres.replace(/\s+/g, '_');
+        doc.save(isGraduated ? `Certificado_Domotica_${safeName}.pdf` : `Reporte_Domotica_${safeName}.pdf`);
+    }
+</script>
+</body>
+</html>
